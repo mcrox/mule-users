@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd">
+	<munit:config name="new-test-suite.xml" />
+	<munit:test name="getUsers-test-suiteTest" description="MUnit Test" doc:id="016c291f-cfe6-43f7-9f94-be51c5b67065" >
+		<munit:execution >
+			<munit:set-event doc:name="Set Event" doc:id="aa2f2b0a-eae3-494a-9623-c972c46db48e" >
+				<munit:attributes value='#[{headers: {"CLIENT-TOKEN" : "qwertyuiop123456"}}]' />
+			</munit:set-event>
+			<flow-ref doc:name="getUsersFlow" doc:id="0352ffbf-0a9f-4805-ad25-f4c2babcbd83" name="getUsersFlow"/>
+		</munit:execution>
+		<munit:validation >
+			<munit-tools:assert-that doc:name="Assert that" doc:id="399a2c53-4b2c-4e4c-a979-fcfe58a4c785" expression="#[payload]" is="#[MunitTools::notNullValue()]"/>
+			<logger level="INFO" doc:name="Logger" doc:id="013a5bec-d7af-4e81-aadb-7a6672a147dc" message="#[payload]"/>
+		</munit:validation>
+	</munit:test>
+	
+	
+	<munit:test name="get-user-by-no-existing-id-test-suiteTest" description="MUnit Test" doc:id="dde70364-f9aa-44db-a87d-a9d9b152c43e" expectedException="org.mule.runtime.api.exception.MuleRuntimeException">
+		<munit:execution>
+			<munit:set-event doc:name="Set Event" doc:id="3f184fdf-2a36-47f1-9356-701093e22e8d">
+				<munit:attributes value='#[{uriParams: {"username": "user8"}, headers: {"CLIENT-TOKEN" : "qwertyuiop123456"}}]' />
+			</munit:set-event>
+			<flow-ref doc:name="getUserByUserIdsFlow" doc:id="06aee71c-cc3f-46e4-b5fd-ae7151c63dd1" name="getUserByUserIdsFlow" />
+		</munit:execution>
+		<munit:validation >
+			<logger level="INFO" doc:name="Logger" doc:id="2b72da72-7658-4fb0-8bb8-b5b0101199d6" message="#['OUTPUT' : payload]"/>
+		</munit:validation>
+	
+	</munit:test>
+	<munit:test name="implementation-test-invalidHeader-suiteTest" description="MUnit Test" doc:id="2d825a7a-cccf-4537-a2a5-b387c11847ec" expectedException="org.mule.runtime.api.exception.MuleRuntimeException">
+		<munit:execution >
+			<munit:set-event doc:name="Set Event" doc:id="49819d81-3083-44fe-a159-9e8d6fce2ce6" >
+				<munit:attributes value='#[{uriParams: {"username": "user2"}, headers: {"CLIENT-TOKEN" : "qwerty"}}]' />
+			</munit:set-event>
+		</munit:execution>
+		<munit:validation >
+			<flow-ref doc:name="getUserByIds" doc:id="500e2fc1-0f3a-495d-a56f-308df5ed5a26" name="getUsersFlow"/>
+		</munit:validation>
+	</munit:test>
+
+</mule>

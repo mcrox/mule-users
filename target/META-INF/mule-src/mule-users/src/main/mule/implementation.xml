@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:email="http://www.mulesoft.org/schema/mule/email" xmlns:netsuite="http://www.mulesoft.org/schema/mule/netsuite"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd">
+	<db:config name="Database_Config" doc:name="Database Config"
+		doc:id="cfa9785f-8a32-4606-a161-152748d16ac7">
+		<db:my-sql-connection host="localhost" port="3306"
+			user="root" password="password" database="mule_users">
+			<db:connection-properties>
+				<db:connection-property key="useSSL" value="false" />
+				<db:connection-property key="allowPublicKeyRetrieval"
+					value="true" />
+			</db:connection-properties>
+		</db:my-sql-connection>
+	</db:config>
+
+	<validation:config name="Validation_Config" doc:name="Validation Config"
+		doc:id="171250ee-e3dd-4d4c-ab12-a8771cb0d70d" i18n="#[payload.users]" />
+	<email:smtp-config name="smtp-gmail" from="supaydo@gmail.com">
+		<email:smtps-connection host="smtp.gmail.com"
+			port="587" password="mySavior!1@" user="supaydo@gmail.com" connectionTimeout="15" readTimeout="15" writeTimeout="15">
+			<tls:context>
+				<tls:trust-store insecure="true" />
+			</tls:context>
+			<email:properties >
+				<email:property key="mail.smtp.starttls.enable" value="true" />
+			</email:properties>
+		</email:smtps-connection>
+	</email:smtp-config>
+	<flow name="getUsersFlow" doc:id="f73c4b04-65dc-4eca-b99b-ae463cb6fff0">
+		<flow-ref doc:name="callValidateHeader" doc:id="71751449-bb6c-43ed-a165-80c64a915de0"
+			name="validateClientTokenHeader" />
+		<db:select doc:name="Select all users" doc:id="3b7db15d-6578-4808-a83b-7cc4fcddb11e"
+			config-ref="Database_Config">
+			<db:sql>SELECT * FROM mule_users.userdetails where
+				userdetails.user_id in (select accounts.user_id from accounts where
+				accounts.active =1);</db:sql>
+		</db:select>
+		<ee:transform doc:name="Transform Message"
+			doc:id="ad67b8b6-a53f-41d7-8741-71d8083ebbb4">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	Users: payload map ( payload01 , indexOfPayload01 ) -> {
+		username: payload01.user_name,
+		fullname: payload01.full_name,
+		gender: if (payload01.gender as String contains "F") "Female" 
+					else if (payload01.gender as String contains "M") "Male"
+						else "",
+		age: (now() - (payload01.birthday as Date)).years,
+		dateRegistered: payload01.date_registered as String {format: "yyyy-MM-dd"}
+		
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="200" doc:name="set HTTP Status"
+			doc:id="98b02fff-e6db-4f93-815f-fd3dc7d61862" variableName="httpStatus" />
+		<logger level="INFO" doc:name="Logger"
+			doc:id="c3b93593-b198-41dd-8fcf-317f14ab22a4" message='#[payload]' />
+	</flow>
+	<flow name="getUserByUserIdsFlow" doc:id="dd71eb85-7899-47f1-9e9b-fc642152d438">
+		<flow-ref doc:name="callValidateHeader" doc:id="b513756c-8922-4587-acf1-6043e63c4011"
+			name="validateClientTokenHeader" />
+		<db:select doc:name="Select User" doc:id="44b8bd4a-9338-448a-b97e-9787661abbca"
+			config-ref="Database_Config">
+			<db:sql>#[&quot;Select * from accounts where accounts.user_id =
+				:userId&quot;]</db:sql>
+			<db:input-parameters><![CDATA[#[{
+
+    userId: attributes.uriParams['username']
+
+  }]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message"
+			doc:id="f9e7c1e0-1250-4147-8658-5cbd1623403c">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	user : payload.user_id
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger"
+			doc:id="c7dba84f-7088-41ff-b242-12fc1a73acce" message='#["user" : payload.user]' />
+		<validation:is-not-empty-collection
+			doc:name="Is not empty collection" doc:id="87ae1291-a2da-46df-9063-36d467a3f096"
+			values="#[payload.user]" message="USER_NOT_FOUND" />
+		<logger level="INFO" doc:name="Logger"
+			doc:id="82e375bc-0422-4a41-a9cd-c69038add2dd" message="DB results is not empty" />
+		<db:select doc:name="Select" doc:id="2b4811e6-c408-42a0-90b8-810d30099ad9"
+			config-ref="Database_Config">
+			<db:sql>#[&quot;Select * from userDetails where userDetails.user_id =
+				:userIdKey&quot;]</db:sql>
+			<db:input-parameters><![CDATA[#[{
+	userIdKey : payload.user[0]
+	
+}]]]></db:input-parameters>
+
+		</db:select>
+		<ee:transform doc:name="Transform Message"
+			doc:id="ad3c39e4-12c0-42a2-ae00-fb4d6f96de82">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	username: payload[0].user_name,
+	fullname: payload[0].full_name,
+	age: (now() - (payload[0].birthday as Date)).years,
+	gender:  if (payload[0].gender as String contains "F") "Female" 
+					else if (payload[0].gender as String contains "M") "Male"
+						else "",
+	dateRegistered: payload[0].date_registered as String {format: "yyyy-MM-dd"}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger"
+			doc:id="89ca1e0a-f0fd-40f2-957c-0531cb1ec070" message="#[payload]" />
+	</flow>
+	<flow name="validateClientTokenHeader" doc:id="d064e261-e4fa-47fb-b266-3e3774e952b8">
+		<validation:validate-size doc:name="Validate size"
+			doc:id="e7a0e9b1-e50c-4884-a5e9-ff7152a68322" value="#[attributes.headers['CLIENT-TOKEN']]"
+			min="16" max="16" message="INVALID_CLIENT_TOKEN" />
+		<validation:matches-regex doc:name="Matches regex"
+			doc:id="3b019486-9053-4419-a050-feb829b96cfe" value="#[attributes.headers['CLIENT-TOKEN']]"
+			regex="^[a-zA-Z0-9]+$" message="INVALID_CLIENT_TOKEN" />
+	</flow>
+	<flow name="practice-getUsersFlow" doc:id="9850f0cb-bfec-44ac-8523-2b11d707e88e">
+		<http:listener doc:name="Listener"
+			doc:id="cf490e11-ac77-499b-a4d6-f6544b69fecd" config-ref="mule-users-httpListenerConfig"
+			path="/test/user" />
+		<db:select doc:name="Copy_of_Select all users" doc:id="6eebac1d-37b4-46e0-a23d-026980332593"
+			config-ref="Database_Config">
+			<db:sql>SELECT * FROM mule_users.userdetails where
+				userdetails.user_id in (select accounts.user_id from accounts where
+				accounts.active =1);</db:sql>
+		</db:select>
+		<ee:transform doc:name="Transform Message"
+			doc:id="587fac75-0076-4622-bd88-8df70ea517ee">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	Users: payload map ( payload01 , indexOfPayload01 ) -> {
+		username: "Test",
+		fullname: null,
+		gender: null,
+		age: null,
+		dateRegistered: null
+		
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-payload value="#[payload]" doc:name="Set Payload"
+			doc:id="2398ee8b-e89e-45d1-9500-438d9935e19b" />
+		<ee:transform doc:name="Copy_of_Transform Message"
+			doc:id="40c73eae-56cd-4237-ad9b-e6df73bb9b2e">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+Users: payload.Users map (obj, index) -> ({
+	 username : obj.username
+})]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="200" doc:name="Copy_of_set HTTP Status"
+			doc:id="d78ef4a6-2552-440d-bf5b-20329e472d52" variableName="httpStatus" />
+		<logger level="INFO" doc:name="Copy_of_Logger"
+			doc:id="497ee77a-c9e0-4eae-b1c6-f03b7585477f" message="#[payload]" />
+	</flow>
+	<flow name="implementationFlow" doc:id="6681a176-975f-4a65-800e-8ccb0080e2b6">
+		<http:listener doc:name="Listener"
+			doc:id="c19002af-5e12-47e0-aa24-e09c6e54f7c1" config-ref="mule-users-httpListenerConfig"
+			path="/test/email" />
+		<logger level="INFO" doc:name="Logger"
+			doc:id="6e1b7188-de0f-41d5-a607-9133de31381a" message="This is triggered by CRON!" />
+		<email:send doc:name="Send" doc:id="da9b5f28-1b94-4f37-be0f-46bd83297715"
+			config-ref="smtp-gmail" fromAddress="supaydo@gmail.com"
+			subject="This is a sample email">
+			<email:to-addresses>
+				<email:to-address value="supaydo@gmail.com" />
+			</email:to-addresses>
+			<email:body contentType="text/plain" encoding="UTF-8" />
+		</email:send>
+		<logger level="INFO" doc:name="Logger"
+			doc:id="9bdb9222-e7c1-4ab7-9995-f979f7e672ee" message="Email Sent!" />
+	</flow>
+</mule>

@@ -1,0 +1,32 @@
+{ 
+
+   "Users": [ 
+		{ 
+
+			"username": "ana", 
+
+			"fullname": null, 
+
+			"age": null, 
+
+			"gender": null, 
+
+			"dateRegistered": null 
+
+		}, 
+
+     { 
+
+       "username": null, 
+
+       "fullname": null, 
+
+       "age": null, 
+
+       "gender": null, 
+
+       "dateRegistered": null 
+
+     }
+	]
+}
